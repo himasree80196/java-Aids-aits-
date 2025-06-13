@@ -1,6 +1,6 @@
 import java.util.*;
 
-public class ManagementSystem{
+public class ManagementSystem {
 
     static HashMap<String, Integer> menu = new HashMap<>();
     static HashMap<String, Integer> itemCost = new HashMap<>();
@@ -10,6 +10,9 @@ public class ManagementSystem{
     static ArrayList<String> feedbackList = new ArrayList<>();
     static ArrayList<String> currentOrder = new ArrayList<>();
     static HashSet<String> customers = new HashSet<>();
+
+    static HashMap<String, Integer> addOnPrices = new HashMap<>();
+    static List<String> availableAddOns = new ArrayList<>();
 
     static int totalBill = 0;
     static boolean isBillPaid = false;
@@ -40,6 +43,7 @@ public class ManagementSystem{
         initializePrepTimes();
         initializeItemCosts();
         initializeItemIngredients();
+        initializeAddOns();
 
         while (true) {
             System.out.println("\nWelcome! Are you a:");
@@ -59,18 +63,14 @@ public class ManagementSystem{
                 break;
             }
         }
-
         sc.close();
     }
 
-    // -------------------- Customer Logic --------------------
     public static void handleCustomer(Scanner sc) {
-        int choice;
-        boolean exit = false;
-
         System.out.print("Enter your name: ");
         currentCustomer = sc.nextLine();
         customers.add(currentCustomer);
+        boolean exit = false;
 
         while (!exit) {
             System.out.println("\n--- Customer Menu ---");
@@ -80,9 +80,11 @@ public class ManagementSystem{
             System.out.println("4. View & Pay Bill");
             System.out.println("5. Submit Feedback");
             System.out.println("6. Process Orders");
-            System.out.println("7. Exit");
+            System.out.println("7. Cancel Table Reservation");
+            System.out.println("8. Exit");
+            System.out.println("9. View Available Tables");
             System.out.print("Enter your choice: ");
-            choice = sc.nextInt();
+            int choice = sc.nextInt();
             sc.nextLine();
 
             switch (choice) {
@@ -92,7 +94,8 @@ public class ManagementSystem{
                 case 4 -> viewBillAndPay(sc);
                 case 5 -> submitFeedback(sc);
                 case 6 -> processOrders();
-                case 7 -> {
+                case 7 -> cancelTable(sc);
+                case 8 -> {
                     if (!isBillPaid && totalBill > 0) {
                         System.out.println("You must clear your bill before exiting.");
                     } else {
@@ -100,15 +103,15 @@ public class ManagementSystem{
                         exit = true;
                     }
                 }
+                case 9 -> viewAvailableTables();
                 default -> System.out.println("Invalid choice!");
             }
         }
-
         currentCustomer = "";
     }
 
     public static void viewMenu() {
-        System.out.println("\n--- Menu ---");
+        System.out.println("\n--- Fast Food Restaurant Menu ---");
         for (String item : menuItems) {
             System.out.println(item + " - Rs." + menu.get(item));
         }
@@ -120,6 +123,19 @@ public class ManagementSystem{
         int index = Collections.binarySearch(menuItems, item);
 
         if (index >= 0) {
+            if (item.equalsIgnoreCase("Water Bottle")) {
+                System.out.print("Do you want Cool or Normal water? ");
+                String type = sc.nextLine().trim().toLowerCase();
+                item = "Water Bottle (" + (type.equals("cool") ? "Cool" : "Normal") + ")";
+                currentOrder.add(item);
+                totalBill += menu.get("Water Bottle");
+                totalCosts += itemCost.getOrDefault("Water Bottle", 0);
+                int time = prepTimeMap.getOrDefault("Water Bottle", 1);
+                orderStack.push(new Order(item, time));
+                System.out.println(item + " added to order. Prep time: " + time + " mins.");
+                return;
+            }
+
             if (!hasSufficientIngredients(item)) {
                 System.out.println("Sorry, not enough ingredients to prepare " + item);
                 return;
@@ -132,6 +148,28 @@ public class ManagementSystem{
             orderStack.push(new Order(item, time));
             reduceInventory(item);
             System.out.println(item + " added to order. Prep time: " + time + " mins.");
+
+            System.out.print("Do you want to add extra toppings (cheese/sauce/chili flakes)? (yes/no): ");
+            String response = sc.nextLine().trim().toLowerCase();
+            if (response.equals("yes")) {
+                System.out.println("Available Add-ons:");
+                for (String addOn : availableAddOns) {
+                    System.out.println("- " + addOn + " (Rs." + addOnPrices.get(addOn) + ")");
+                }
+                System.out.print("Enter add-on name: ");
+                String addOn = sc.nextLine();
+                if (addOnPrices.containsKey(addOn)) {
+                    if (inventory.getOrDefault(addOn, 0) > 0) {
+                        totalBill += addOnPrices.get(addOn);
+                        inventory.put(addOn, inventory.get(addOn) - 1);
+                        System.out.println(addOn + " added. Extra cost: Rs." + addOnPrices.get(addOn));
+                    } else {
+                        System.out.println("Sorry, " + addOn + " is out of stock.");
+                    }
+                } else {
+                    System.out.println("Invalid add-on.");
+                }
+            }
         } else {
             System.out.println("Item not found!");
         }
@@ -150,16 +188,28 @@ public class ManagementSystem{
         }
     }
 
+    public static void cancelTable(Scanner sc) {
+        System.out.print("Enter table number to cancel (0-9): ");
+        int tableNo = sc.nextInt();
+        if (tableNo < 0 || tableNo >= tables.length) {
+            System.out.println("Invalid table number!");
+        } else if (!tables[tableNo]) {
+            System.out.println("Table is not reserved.");
+        } else {
+            tables[tableNo] = false;
+            System.out.println("Reservation for table " + tableNo + " has been canceled.");
+        }
+    }
+
     public static void viewBillAndPay(Scanner sc) {
         System.out.println("\n--- Bill Summary ---");
         for (String item : currentOrder) {
-            System.out.println(item + " - Rs." + menu.get(item));
+            System.out.println(item + " - Rs." + menu.getOrDefault(item.replaceAll(" \\(.*\\)", ""), 0));
         }
         System.out.println("Total: Rs." + totalBill);
 
         System.out.print("Do you want to pay the bill now? (yes/no): ");
         String pay = sc.nextLine().trim().toLowerCase();
-
         if (pay.equals("yes")) {
             isBillPaid = true;
             totalEarnings += totalBill;
@@ -178,38 +228,40 @@ public class ManagementSystem{
 
     public static void processOrders() {
         System.out.println("\n--- Order Processing ---");
-
-        if (!isBillPaid){
+        if (!isBillPaid) {
             System.out.println("Cannot process orders. Bill was not paid!");
             return;
         }
-
         int totalTime = 0;
-
         if (orderStack.isEmpty()) {
             System.out.println("No orders to process.");
             return;
         }
-
         while (!orderStack.isEmpty()) {
             Order o = orderStack.pop();
             System.out.println("Preparing: " + o.itemName + " (Time: " + o.prepTime + " mins)");
             totalTime += o.prepTime;
         }
-
-        if (totalTime > 0) {
-            System.out.println("Total preparation time: " + totalTime + " mins.");
-        }
-
+        System.out.println("Total preparation time: " + totalTime + " mins.");
         currentOrder.clear();
         totalBill = 0;
         isBillPaid = false;
     }
 
-    // -------------------- Admin Logic --------------------
+    public static void viewAvailableTables() {
+        int available = 0;
+        System.out.print("Available tables: ");
+        for (int i = 0; i < tables.length; i++) {
+            if (!tables[i]) {
+                System.out.print(i + " ");
+                available++;
+            }
+        }
+        System.out.println("\nTotal available tables: " + available);
+    }
+
     public static void handleAdmin(Scanner sc) {
         int choice;
-
         while (true) {
             System.out.println("\n--- Admin Dashboard ---");
             System.out.println("1. View Inventory");
@@ -221,13 +273,14 @@ public class ManagementSystem{
             System.out.print("Enter your choice: ");
             choice = sc.nextInt();
             sc.nextLine();
-
             switch (choice) {
                 case 1 -> viewInventory();
                 case 2 -> System.out.println("Total customers: " + customers.size());
                 case 3 -> System.out.println("Total employees: " + employeeCount);
                 case 4 -> viewProfitLoss();
-                case 5 -> { return; }
+                case 5 -> {
+                    return;
+                }
                 case 6 -> updateInventory(sc);
                 default -> System.out.println("Invalid choice!");
             }
@@ -251,11 +304,9 @@ public class ManagementSystem{
     public static void updateInventory(Scanner sc) {
         System.out.print("Enter inventory item name: ");
         String item = sc.nextLine();
-
         System.out.print("Enter quantity to add: ");
         int quantity = sc.nextInt();
-        sc.nextLine(); // Consume newline
-
+        sc.nextLine();
         if (inventory.containsKey(item)) {
             inventory.put(item, inventory.get(item) + quantity);
             System.out.println("Updated " + item + " quantity to " + inventory.get(item));
@@ -265,13 +316,13 @@ public class ManagementSystem{
         }
     }
 
-    // -------------------- Init --------------------
     public static void initializeMenu() {
         menu.put("Pizza", 250);
         menu.put("Burger", 120);
         menu.put("Pasta", 200);
         menu.put("Fries", 100);
         menu.put("Coke", 50);
+        menu.put("Water Bottle", 20);
         menuItems.addAll(menu.keySet());
         Collections.sort(menuItems);
     }
@@ -282,6 +333,7 @@ public class ManagementSystem{
         prepTimeMap.put("Pasta", 12);
         prepTimeMap.put("Fries", 8);
         prepTimeMap.put("Coke", 2);
+        prepTimeMap.put("Water Bottle", 1);
     }
 
     public static void initializeInventory() {
@@ -290,6 +342,7 @@ public class ManagementSystem{
         inventory.put("Sauce", 70);
         inventory.put("Potato", 60);
         inventory.put("Soda", 80);
+        inventory.put("Water Bottle", 100);
     }
 
     public static void initializeItemCosts() {
@@ -298,6 +351,7 @@ public class ManagementSystem{
         itemCost.put("Pasta", 100);
         itemCost.put("Fries", 50);
         itemCost.put("Coke", 20);
+        itemCost.put("Water Bottle", 5);
     }
 
     public static void initializeItemIngredients() {
@@ -308,9 +362,19 @@ public class ManagementSystem{
         itemIngredients.put("Coke", Arrays.asList("Soda"));
     }
 
+    public static void initializeAddOns() {
+        addOnPrices.put("Extra Cheese", 20);
+        addOnPrices.put("Extra Sauce", 15);
+        addOnPrices.put("Chili Flakes", 10);
+        availableAddOns.addAll(addOnPrices.keySet());
+        inventory.put("Extra Cheese", 30);
+        inventory.put("Extra Sauce", 30);
+        inventory.put("Chili Flakes", 30);
+    }
+
     public static boolean hasSufficientIngredients(String item) {
         List<String> ingredients = itemIngredients.get(item);
-        if (ingredients == null) return false;
+        if (ingredients == null) return true;
         for (String ing : ingredients) {
             if (inventory.getOrDefault(ing, 0) <= 0) return false;
         }
