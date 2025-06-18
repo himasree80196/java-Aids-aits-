@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.VBox?>
+
+<AnchorPane fx:id="rootAnchorPane" prefHeight="400.0" prefWidth="600.0"
+            xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="application.MenuController">
+   <children>
+      <VBox alignment="CENTER" spacing="10.0"
+            AnchorPane.topAnchor="10.0"
+            AnchorPane.leftAnchor="10.0"
+            AnchorPane.rightAnchor="10.0"
+            AnchorPane.bottomAnchor="10.0">
+         <children>
+            <Label text="Menu Items" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+            <TableView fx:id="menuTableView" VBox.vgrow="ALWAYS">
+                <columns>
+                    <TableColumn fx:id="idColumn" text="ID" prefWidth="75.0"/>
+                    <TableColumn fx:id="nameColumn" text="Item Name" prefWidth="200.0"/>
+                    <TableColumn fx:id="priceColumn" text="Price" prefWidth="100.0"/>
+                </columns>
+            </TableView>
+            <Label fx:id="statusLabel" text="Loading menu..." style="-fx-font-size: 14px; -fx-text-fill: gray;"/>
+         </children>
+      </VBox>
+   </children>
+</AnchorPane>
